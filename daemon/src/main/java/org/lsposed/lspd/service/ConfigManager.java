@@ -150,6 +150,7 @@ public class ConfigManager {
             "mid integer," +
             "app_pkg_name text NOT NULL," +
             "user_id integer NOT NULL," +
+            "enable_native integer NOT NULL DEFAULT 1," +
             "PRIMARY KEY (mid, app_pkg_name, user_id)," +
             "CONSTRAINT scope_module_constraint" +
             "  FOREIGN KEY (mid)" +
@@ -216,13 +217,15 @@ public class ConfigManager {
     @SuppressLint("BlockedPrivateApi")
     public List<Module> getModulesForSystemServer() {
         List<Module> modules = new LinkedList<>();
-        try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"module_pkg_name", "apk_path"}, "app_pkg_name=? AND enabled=1", new String[]{"system"}, null, null, null)) {
+        try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"module_pkg_name", "apk_path", "enable_native"}, "app_pkg_name=? AND enabled=1", new String[]{"system"}, null, null, null)) {
             int apkPathIdx = cursor.getColumnIndex("apk_path");
             int pkgNameIdx = cursor.getColumnIndex("module_pkg_name");
+            int enableNativeIdx = cursor.getColumnIndex("enable_native");
             while (cursor.moveToNext()) {
                 var module = new Module();
                 module.apkPath = cursor.getString(apkPathIdx);
                 module.packageName = cursor.getString(pkgNameIdx);
+                module.enableNative = cursor.getInt(enableNativeIdx) == 1;
                 var cached = cachedModule.get(module.packageName);
                 if (cached != null) {
                     modules.add(cached);
@@ -662,11 +665,12 @@ public class ConfigManager {
             else lastScopeCacheTime = SystemClock.elapsedRealtime();
         }
         cachedScope.clear();
-        try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"app_pkg_name", "module_pkg_name", "user_id"},
+        try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"app_pkg_name", "module_pkg_name", "user_id", "enable_native"},
                 "enabled = 1", null, null, null, null)) {
             int appPkgNameIdx = cursor.getColumnIndex("app_pkg_name");
             int modulePkgNameIdx = cursor.getColumnIndex("module_pkg_name");
             int userIdIdx = cursor.getColumnIndex("user_id");
+            int enableNativeIdx = cursor.getColumnIndex("enable_native");
 
             final var obsoletePackages = new HashSet<Application>();
             final var obsoleteModules = new HashSet<Application>();
@@ -716,6 +720,7 @@ public class ConfigManager {
                     }
                     var module = cachedModule.get(modulePackageName);
                     assert module != null;
+                    module.enableNative = cursor.getInt(enableNativeIdx) == 1;
                     for (ProcessScope processScope : processesScope) {
                         cachedScope.computeIfAbsent(processScope,
                                 ignored -> new LinkedList<>()).add(module);
@@ -875,6 +880,24 @@ public class ConfigManager {
             }
         });
         // Called by manager, should be async
+        updateCaches(false);
+        return true;
+    }
+
+    public boolean setModuleScope(String packageName, String scopePackageName, int userId, int enableNative) {
+        if (scopePackageName == null) return false;
+        int mid = getModuleId(packageName);
+        if (mid == -1) return false;
+        if (scopePackageName.equals("system") && userId != 0) return false;
+        executeInTransaction(() -> {
+            ContentValues values = new ContentValues();
+            values.put("mid", mid);
+            values.put("app_pkg_name", scopePackageName);
+            values.put("user_id", userId);
+            values.put("enable_native", enableNative);
+            db.insertWithOnConflict("scope", null, values, SQLiteDatabase.CONFLICT_IGNORE);
+        });
+        // Called by xposed service, should be async
         updateCaches(false);
         return true;
     }

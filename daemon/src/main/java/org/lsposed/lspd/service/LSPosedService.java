@@ -295,6 +295,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         if (scopePackageName == null) return;
         scopePackageName = scopePackageName.substring(1);
         var action = data.getQueryParameter("action");
+        var enableNative = data.getBooleanQueryParameter("native", true);
         if (action == null) return;
 
         var iCallback = IXposedScopeCallback.Stub.asInterface(callback);
@@ -306,8 +307,11 @@ public class LSPosedService extends ILSPosedService.Stub {
             }
 
             switch (action) {
+                case "enable" -> {
+                    ConfigManager.getInstance().enableModule(packageName);
+                }
                 case "approve" -> {
-                    ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId);
+                    ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId, enableNative ? 1 : 0);
                     iCallback.onScopeRequestApproved(scopePackageName);
                 }
                 case "deny" -> iCallback.onScopeRequestDenied(scopePackageName);
@@ -427,6 +431,11 @@ public class LSPosedService extends ILSPosedService.Stub {
     private void registerModuleScopeReceiver() {
         var intentFilter = new IntentFilter(LSPNotificationManager.moduleScope);
         intentFilter.addDataScheme("module");
+
+        var elecscopeIntentFilter = new IntentFilter("elecscope");
+        elecscopeIntentFilter.addDataScheme("module");
+
+        registerReceiver(List.of(intentFilter, elecscopeIntentFilter), "android.permission.BRICK", 0, this::dispatchModuleScope, Context.RECEIVER_EXPORTED);
 
         registerReceiver(List.of(intentFilter), 0, this::dispatchModuleScope);
         Log.d(TAG, "registered module scope receiver");

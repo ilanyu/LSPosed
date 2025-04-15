@@ -229,8 +229,9 @@ public final class XposedInit {
             var apk = module.apkPath;
             var name = module.packageName;
             var file = module.file;
+            var enableNative = module.enableNative;
             loadedModules.put(name, Optional.of(apk)); // temporarily add it for XSharedPreference
-            if (!loadModule(name, apk, file)) {
+            if (!loadModule(name, apk, file, enableNative)) {
                 loadedModules.remove(name);
             }
         });
@@ -300,7 +301,7 @@ public final class XposedInit {
      * Load a module from an APK by calling the init(String) method for all classes defined
      * in <code>assets/xposed_init</code>.
      */
-    private static boolean loadModule(String name, String apk, PreLoadedApk file) {
+    private static boolean loadModule(String name, String apk, PreLoadedApk file, boolean enableNative) {
         Log.i(TAG, "Loading legacy module " + name + " from " + apk);
 
         var sb = new StringBuilder();
@@ -324,7 +325,9 @@ public final class XposedInit {
         } catch (ClassNotFoundException ignored) {
             return false;
         }
-        initNativeModule(file.moduleLibraryNames);
+        if (enableNative) {
+            initNativeModule(file.moduleLibraryNames);
+        }
         return initModule(mcl, apk, file.moduleClassNames);
     }
 

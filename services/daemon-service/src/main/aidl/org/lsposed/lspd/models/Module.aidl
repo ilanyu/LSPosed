@@ -9,4 +9,5 @@ parcelable Module {
     PreLoadedApk file;
     ApplicationInfo applicationInfo;
     ILSPInjectedModuleService service;
+    boolean enableNative;
 }
