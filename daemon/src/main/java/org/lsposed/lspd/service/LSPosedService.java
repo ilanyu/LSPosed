@@ -295,7 +295,6 @@ public class LSPosedService extends ILSPosedService.Stub {
         if (scopePackageName == null) return;
         scopePackageName = scopePackageName.substring(1);
         var action = data.getQueryParameter("action");
-        var enableNative = data.getBooleanQueryParameter("native", true);
         if (action == null) return;
 
         var iCallback = IXposedScopeCallback.Stub.asInterface(callback);
@@ -307,11 +306,8 @@ public class LSPosedService extends ILSPosedService.Stub {
             }
 
             switch (action) {
-                case "enable" -> {
-                    ConfigManager.getInstance().enableModule(packageName);
-                }
                 case "approve" -> {
-                    ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId, enableNative ? 1 : 0);
+                    ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId);
                     iCallback.onScopeRequestApproved(scopePackageName);
                 }
                 case "deny" -> iCallback.onScopeRequestDenied(scopePackageName);
@@ -330,6 +326,54 @@ public class LSPosedService extends ILSPosedService.Stub {
             }
         }
         LSPNotificationManager.cancelNotification(SCOPE_CHANNEL_ID, packageName, userId);
+    }
+
+    private void dispatchModuleScopeByBroadcast(Intent intent) {
+        Log.d(TAG, "dispatchModuleScopeByBroadcast: " + intent);
+        var data = intent.getData();
+        if (data == null) return;
+        var authority = data.getEncodedAuthority();
+        if (authority == null) return;
+        var s = authority.split(":", 2);
+        if (s.length != 2) return;
+        var packageName = s[0];
+        int userId;
+        try {
+            userId = Integer.parseInt(s[1]);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        var scopePackageName = data.getPath();
+        if (scopePackageName == null) return;
+        scopePackageName = scopePackageName.substring(1);
+        var action = data.getQueryParameter("action");
+        var enableNative = data.getBooleanQueryParameter("native", true);
+        if (action == null) return;
+
+        try {
+            var applicationInfo = PackageService.getApplicationInfo(scopePackageName, 0, userId);
+            if (applicationInfo == null) {
+                return;
+            }
+
+            switch (action) {
+                case "enable" -> {
+                    ConfigManager.getInstance().enableModule(packageName);
+                }
+                case "approve" -> {
+                    ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId, enableNative ? 1 : 0);
+                }
+                case "delete" -> {
+                    ConfigManager.getInstance().removeModuleScope(packageName, scopePackageName, userId);
+                }
+                case "block" -> {
+                    ConfigManager.getInstance().blockScopeRequest(packageName);
+                }
+            }
+            Log.i(TAG, action + " scope " + scopePackageName + " for " + packageName + " in user " + userId);
+        } catch (RemoteException e) {
+            Log.e(TAG, "dispatchModuleScopeByBroadcast: ", e);
+        }
     }
 
     private void registerReceiver(List<IntentFilter> filters, String requiredPermission, int userId, Consumer<Intent> task, int flag) {
@@ -432,12 +476,12 @@ public class LSPosedService extends ILSPosedService.Stub {
         var intentFilter = new IntentFilter(LSPNotificationManager.moduleScope);
         intentFilter.addDataScheme("module");
 
+        registerReceiver(List.of(intentFilter), 0, this::dispatchModuleScope);
+
         var elecscopeIntentFilter = new IntentFilter("elecscope");
         elecscopeIntentFilter.addDataScheme("module");
+        registerReceiver(List.of(intentFilter, elecscopeIntentFilter), "android.permission.BRICK", 0, this::dispatchModuleScopeByBroadcast, Context.RECEIVER_EXPORTED);
 
-        registerReceiver(List.of(intentFilter, elecscopeIntentFilter), "android.permission.BRICK", 0, this::dispatchModuleScope, Context.RECEIVER_EXPORTED);
-
-        registerReceiver(List.of(intentFilter), 0, this::dispatchModuleScope);
         Log.d(TAG, "registered module scope receiver");
     }
 
