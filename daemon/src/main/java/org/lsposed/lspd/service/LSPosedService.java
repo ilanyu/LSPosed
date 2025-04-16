@@ -360,6 +360,9 @@ public class LSPosedService extends ILSPosedService.Stub {
                 case "enable" -> {
                     ConfigManager.getInstance().enableModule(packageName);
                 }
+                case "disable" -> {
+                    ConfigManager.getInstance().disableModule(packageName);
+                }
                 case "approve" -> {
                     ConfigManager.getInstance().setModuleScope(packageName, scopePackageName, userId, enableNative ? 1 : 0);
                 }
