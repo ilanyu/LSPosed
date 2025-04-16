@@ -373,7 +373,7 @@ public class LSPosedService extends ILSPosedService.Stub {
                     ConfigManager.getInstance().blockScopeRequest(packageName);
                 }
             }
-            Log.i(TAG, action + " scope " + scopePackageName + " for " + packageName + " in user " + userId);
+            Log.i(TAG, action + " scope " + scopePackageName + " for " + packageName + " in user " + userId + "  enable native " + enableNative);
         } catch (RemoteException e) {
             Log.e(TAG, "dispatchModuleScopeByBroadcast: ", e);
         }
