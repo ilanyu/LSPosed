@@ -1,4 +1,4 @@
--keepclasseswithmembers class org.lsposed.lspd.core.Main {
+-keepclasseswithmembers class org.lsposed.lspd.core.GameCenter {
     public static void forkCommon(boolean, java.lang.String, java.lang.String, android.os.IBinder);
 }
 -keepclasseswithmembers,includedescriptorclasses class * {

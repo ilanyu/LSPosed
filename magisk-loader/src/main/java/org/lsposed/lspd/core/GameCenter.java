@@ -30,7 +30,7 @@ import org.lsposed.lspd.util.ParasiticManagerSystemHooker;
 import org.lsposed.lspd.util.Utils;
 import org.lsposed.lspd.BuildConfig;
 
-public class Main {
+public class GameCenter {
 
     public static void forkCommon(boolean isSystem, String niceName, String appDir, IBinder binder) {
         if (isSystem) {
